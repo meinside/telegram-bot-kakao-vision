@@ -1,0 +1,6 @@
+{
+	"telegram-api-token": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+	"telegram-monitor-interval-seconds": 1,
+	"kakao-rest-api-key": "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+	"is-verbose": true
+}
