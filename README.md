@@ -2,6 +2,8 @@
 
 This Telegram Bot was built for showing how to use [Go wrapper for Kakao Vision API](https://github.com/meinside/kakao-api-go).
 
+Slightly modified from my previous project: [MS Cognitive API Bot](https://github.com/meinside/telegram-ms-cognitive-bot).
+
 ## Preparation
 
 Install essential libraries and packages:
@@ -81,6 +83,10 @@ and will start with:
 ```bash
 $ sudo systemctl start telegram-bot-kakao-vision.service
 ```
+
+## Sample
+
+* [@kakao_vision_api_bot](https://telegram.me/kakao_vision_api_bot) is being run on my tiny Raspberry Pi server, so **don't be mad if it doesn't respond to your message.**
 
 ## License
 
