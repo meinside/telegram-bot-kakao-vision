@@ -172,8 +172,11 @@ func init() {
 	}
 
 	// others
-	if bytes, err := ioutil.ReadFile(fontFilepath); err == nil {
-		if f, err := truetype.Parse(bytes); err == nil {
+	bytes, err := ioutil.ReadFile(fontFilepath)
+	if err == nil {
+		var f *truetype.Font
+		f, err = truetype.Parse(bytes)
+		if err == nil {
 			font = f
 		} else {
 			panic(err)
@@ -371,18 +374,26 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 	// 'typing...'
 	b.SendChatAction(chatID, bot.ChatActionTyping)
 
+	var err error
+
 	switch command {
 	case Face, MaskFaces:
-		if detected, err := kakaoClient.DetectFaceFromURL(fileURL, 0.7); err == nil {
+		var detected kakaoapi.ResponseDetectedFace
+		detected, err = kakaoClient.DetectFaceFromURL(fileURL, 0.7)
+		if err == nil {
 			if len(detected.Result.Faces) > 0 {
 				// open image from url,
-				if resp, err := http.Get(fileURL); err == nil {
+				var resp *http.Response
+				resp, err = http.Get(fileURL)
+				if err == nil {
 					defer resp.Body.Close()
 
 					// image's width and height
 					width, height := float64(detected.Result.Width), float64(detected.Result.Height)
 
-					if img, _, err := image.Decode(resp.Body); err == nil {
+					var img image.Image
+					img, _, err = image.Decode(resp.Body)
+					if err == nil {
 						// copy to a new image
 						newImg := image.NewRGBA(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
 						draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
@@ -491,7 +502,8 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 
 						// send a photo with rectangles drawn on detected faces
 						buf := new(bytes.Buffer)
-						if err := jpeg.Encode(buf, newImg, nil); err == nil {
+						err = jpeg.Encode(buf, newImg, nil)
+						if err == nil {
 							if sent := b.SendPhoto(chatID, bot.InputFileFromBytes(buf.Bytes()), map[string]interface{}{
 								"caption": fmt.Sprintf("Process result of '%s'", command),
 							}); !sent.Ok {
@@ -513,7 +525,9 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 			errorMessage = fmt.Sprintf("Failed to detect faces: %s", err)
 		}
 	case Product:
-		if detected, err := kakaoClient.DetectProductFromURL(fileURL, 0.7); err == nil {
+		var detected kakaoapi.ResponseDetectedProduct
+		detected, err = kakaoClient.DetectProductFromURL(fileURL, 0.7)
+		if err == nil {
 			if len(detected.Result.Objects) > 0 {
 				// open image from url,
 				if resp, err := http.Get(fileURL); err == nil {
@@ -522,7 +536,9 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 					// image's width and height
 					width, height := float64(detected.Result.Width), float64(detected.Result.Height)
 
-					if img, _, err := image.Decode(resp.Body); err == nil {
+					var img image.Image
+					img, _, err = image.Decode(resp.Body)
+					if err == nil {
 						// copy to a new image
 						newImg := image.NewRGBA(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
 						draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
@@ -576,7 +592,8 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 
 						// send a photo with rectangles drawn on detected faces
 						buf := new(bytes.Buffer)
-						if err := jpeg.Encode(buf, newImg, nil); err == nil {
+						err = jpeg.Encode(buf, newImg, nil)
+						if err == nil {
 							if sent := b.SendPhoto(chatID, bot.InputFileFromBytes(buf.Bytes()), map[string]interface{}{
 								"caption": fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(classes, "\n")),
 							}); !sent.Ok {
