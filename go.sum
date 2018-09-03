@@ -11,8 +11,8 @@ github.com/llgcode/ps v0.0.0-20150911083025-f1443b32eedb h1:61ndUreYSlWFeCY44JxD
 github.com/llgcode/ps v0.0.0-20150911083025-f1443b32eedb/go.mod h1:1l8ky+Ew27CMX29uG+a2hNOKpeNYEQjjtiALiBlFQbY=
 github.com/meinside/kakao-api-go v0.1.0 h1:UB6p10GWrQqUPicaRzeo4sgqO1mTiZHAFokxocVA7no=
 github.com/meinside/kakao-api-go v0.1.0/go.mod h1:UaCB48aIMu9m7z9+y2/65YPisKdTH0vrg+DMWLlmqU8=
-github.com/meinside/loggly-go v0.1.0 h1:pNa7+fB109mZgJ5qrlbtzdlt5/MHZBm7jUSx0C6HEe4=
-github.com/meinside/loggly-go v0.1.0/go.mod h1:PZPbV/jxZBRU1hFv/8uo+Hus3p1PZe8ny85vPsCxUSs=
+github.com/meinside/loggly-go v0.1.1 h1:5Vm0XjATlGNkRzS/xAep61ZpAOs6w4XwOOvrggWgB8M=
+github.com/meinside/loggly-go v0.1.1/go.mod h1:PZPbV/jxZBRU1hFv/8uo+Hus3p1PZe8ny85vPsCxUSs=
 github.com/meinside/telegram-bot-go v0.0.2 h1:yAAYhyWOhpOhZw5vJKgHc/wuj5sLa/uSliT+z1ipgnU=
 github.com/meinside/telegram-bot-go v0.0.2/go.mod h1:0fDch0mdkOg96AxEZnFWTn6Q46tpfuMExAGZiomYucg=
 golang.org/x/image v0.0.0-20180708004352-c73c2afc3b81 h1:00VmoueYNlNz/aHIilyyQz/MHSqGoWJzpFv/HW8xpzI=
