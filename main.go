@@ -287,21 +287,19 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 	result := false // process result
 
 	var message string
-	var options = map[string]interface{}{
-		"reply_to_message_id": update.Message.MessageID,
-	}
+	options := bot.OptionsSendMessage{}.SetReplyToMessageID(update.Message.MessageID)
 
 	if update.Message.HasPhoto() {
 		lastIndex := len(update.Message.Photo) - 1 // XXX - last one is the largest
 
-		options["reply_markup"] = bot.InlineKeyboardMarkup{
+		options.SetReplyMarkup(bot.InlineKeyboardMarkup{
 			InlineKeyboard: genImageInlineKeyboards(update.Message.Photo[lastIndex].FileID),
-		}
+		})
 		message = messageActionImage
 	} else if update.Message.HasDocument() && strings.HasPrefix(*update.Message.Document.MimeType, "image/") {
-		options["reply_markup"] = bot.InlineKeyboardMarkup{
+		options.SetReplyMarkup(bot.InlineKeyboardMarkup{
 			InlineKeyboard: genImageInlineKeyboards(update.Message.Document.FileID),
-		}
+		})
 		message = messageActionImage
 	} else {
 		message = messageHelp
@@ -361,11 +359,10 @@ func processCallbackQuery(b *bot.Bot, update bot.Update) bool {
 	// answer callback query
 	if apiResult := b.AnswerCallbackQuery(query.ID, nil); apiResult.Ok {
 		// edit message and remove inline keyboards
-		options := map[string]interface{}{
-			"chat_id":    query.Message.Chat.ID,
-			"message_id": query.Message.MessageID,
-		}
-		if apiResult := b.EditMessageText(message, options); apiResult.Ok {
+		if apiResult := b.EditMessageText(
+			message,
+			bot.OptionsEditMessageText{}.SetIDs(query.Message.Chat.ID, query.Message.MessageID),
+		); apiResult.Ok {
 			result = true
 		} else {
 			logError(fmt.Sprintf("Failed to edit message text: %s", *apiResult.Description))
@@ -514,9 +511,11 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 						buf := new(bytes.Buffer)
 						err = jpeg.Encode(buf, newImg, nil)
 						if err == nil {
-							if sent := b.SendPhoto(chatID, bot.InputFileFromBytes(buf.Bytes()), map[string]interface{}{
-								"caption": fmt.Sprintf("Process result of '%s'", command),
-							}); !sent.Ok {
+							if sent := b.SendPhoto(
+								chatID,
+								bot.InputFileFromBytes(buf.Bytes()),
+								bot.OptionsSendPhoto{}.SetCaption(fmt.Sprintf("Process result of '%s'", command)),
+							); !sent.Ok {
 								errorMessage = fmt.Sprintf("Failed to send image: %s", *sent.Description)
 							}
 						} else {
@@ -604,9 +603,11 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 						buf := new(bytes.Buffer)
 						err = jpeg.Encode(buf, newImg, nil)
 						if err == nil {
-							if sent := b.SendPhoto(chatID, bot.InputFileFromBytes(buf.Bytes()), map[string]interface{}{
-								"caption": fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(classes, "\n")),
-							}); !sent.Ok {
+							if sent := b.SendPhoto(
+								chatID,
+								bot.InputFileFromBytes(buf.Bytes()),
+								bot.OptionsSendPhoto{}.SetCaption(fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(classes, "\n"))),
+							); !sent.Ok {
 								errorMessage = fmt.Sprintf("Failed to send image: %s", *sent.Description)
 							}
 						} else {
