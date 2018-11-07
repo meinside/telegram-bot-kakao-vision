@@ -84,6 +84,22 @@ and will start with:
 $ sudo systemctl start telegram-bot-kakao-vision.service
 ```
 
+## Run with docker
+
+Build a docker image:
+
+```bash
+$ docker build -t telegram-bot-kakao-vision .
+```
+
+then run it with:
+
+```bash
+$ docker run --restart=always telegram-bot-kakao-vision
+```
+
+or, run it as a service with systemd service file: `systemd/telegram-bot-kakao-vision-docker.service`.
+
 ## Sample
 
 * [@kakao_vision_api_bot](https://telegram.me/kakao_vision_api_bot) is being run on my tiny Raspberry Pi server, so **don't be mad if it doesn't respond to your message.**

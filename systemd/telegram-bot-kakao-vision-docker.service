@@ -1,0 +1,19 @@
+[Unit]
+Description=Telegram Bot for Kakao Vision API (Docker)
+After=syslog.target
+After=network.target
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+User=some_user
+Group=some_user
+ExecStart=/usr/bin/docker start -a telegram-bot-kakao-vision
+ExecStop=/usr/bin/docker stop -t 2 telegram-bot-kakao-vision
+Restart=always
+RestartSec=5
+Environment=
+
+[Install]
+WantedBy=multi-user.target
