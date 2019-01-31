@@ -233,7 +233,7 @@ func logMessage(message string) {
 	log.Println(message)
 
 	if logger != nil {
-		_, timestamp := logger.Timestamp()
+		_, timestamp := loggly.Timestamp()
 
 		logger.Log(logglyLog{
 			Application: appName,
@@ -249,7 +249,7 @@ func logError(message string) {
 	log.Println(message)
 
 	if logger != nil {
-		_, timestamp := logger.Timestamp()
+		_, timestamp := loggly.Timestamp()
 
 		logger.Log(logglyLog{
 			Application: appName,
@@ -263,7 +263,7 @@ func logError(message string) {
 // log request from user
 func logRequest(username, fileURL string, command VisionCommand) {
 	if logger != nil {
-		_, timestamp := logger.Timestamp()
+		_, timestamp := loggly.Timestamp()
 
 		logger.Log(logglyLog{
 			Application: appName,
