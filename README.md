@@ -79,7 +79,7 @@ then run it with:
 $ docker run --restart=always telegram-bot-kakao-vision:latest
 ```
 
-### Run with docker-compose
+### D. Run with docker-compose
 
 ```bash
 $ docker-compose build
