@@ -4,27 +4,6 @@ This Telegram Bot was built for showing how to use [Go wrapper for Kakao Vision 
 
 Slightly modified from my previous project: [MS Cognitive API Bot](https://github.com/meinside/telegram-ms-cognitive-bot).
 
-## Preparation
-
-Install essential libraries and packages:
-
-```bash
-# for freetype font and image manipulation
-$ sudo apt-get install libgl1-mesa-dev
-$ go get github.com/golang/freetype/...
-$ go get github.com/llgcode/draw2d/...
-$ go get github.com/disintegration/gift
-
-# for telegram bot api
-$ go get github.com/meinside/telegram-bot-go
-
-# for kakao rest api for vision
-$ go get github.com/meinside/kakao-api-go/...
-
-# for loggly
-$ go get github.com/meinside/loggly-go
-```
-
 ## Install & Build
 
 ```bash
@@ -55,15 +34,17 @@ For example:
 
 ## How to Run
 
+### A. Just run it
+
 After all things are setup correctly, just run the built binary:
 
 ```bash
 $ ./telegram-bot-kakao-vision
 ```
 
-## How to Run as a Service
+### B. Run as a systemd Service
 
-### a. systemd
+#### a. systemd
 
 ```bash
 $ sudo cp systemd/telegram-bot-kakao-vision.service /lib/systemd/system/
@@ -84,25 +65,43 @@ and will start with:
 $ sudo systemctl start telegram-bot-kakao-vision.service
 ```
 
-## Run with docker
+### C. Run with docker
 
 Build a docker image:
 
 ```bash
-$ docker build -t telegram-bot-kakao-vision .
+$ docker build -t telegram-bot-kakao-vision:latest .
 ```
 
 then run it with:
 
 ```bash
-$ docker run --restart=always telegram-bot-kakao-vision
+$ docker run --restart=always telegram-bot-kakao-vision:latest
 ```
 
-or, run it as a service with systemd service file: `systemd/telegram-bot-kakao-vision-docker.service`.
+### Run with docker-compose
+
+```bash
+$ docker-compose build
+```
+
+and then start with:
+
+```bash
+$ docker-compose up -d
+```
+
+## Tips
+
+You can remove intermediate images with:
+
+```bash
+$ docker rmi $(docker images --filter "dangling=true" -q --no-trunc)
+```
 
 ## Sample
 
-* [@kakao_vision_api_bot](https://telegram.me/kakao_vision_api_bot) is being run on my tiny Raspberry Pi server, so **don't be mad if it doesn't respond to your message.**
+* [@kakao_vision_api_bot](https://telegram.me/kakao_vision_api_bot) is being run on my tiny Raspberry Pi server, so **don't be mad if it doesn't respond to your messages.**
 
 ## License
 

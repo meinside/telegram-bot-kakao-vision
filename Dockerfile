@@ -1,20 +1,10 @@
 # Dockerfile for Golang application
-#
-# from https://gist.github.com/meinside/91470b0c3e78c4ee500d6763f9ecc7da
-#
-# $ docker login
-# $ docker build -t image-name .
-# or
-# $ docker build -t image-name --build-arg GO_VERESION=1.11 .
-# or
-# $ docker build -t image-name --build-arg CONF_FILE=config.json .
 
 # Arguments
-ARG GO_VERSION=1.11.2
 ARG CONF_FILE=config.json
 
 # Temporary image for building
-FROM golang:${GO_VERSION}-alpine AS builder
+FROM meinside/alpine-golang:latest AS builder
 
 # Add unprivileged user/group
 RUN mkdir /user && \

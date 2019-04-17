@@ -1,0 +1,7 @@
+version: "3.7"
+services:
+  app:
+    build: .
+    image: telegram-bot-kakao-vision:latest
+    restart: always
+    command: app

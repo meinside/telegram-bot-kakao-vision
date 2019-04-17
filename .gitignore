@@ -1,5 +1,3 @@
 *.swp*
-
-config.json
-
+config.json*
 telegram-bot-kakao-vision
