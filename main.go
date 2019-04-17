@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -138,11 +139,15 @@ var conf Config
 
 func init() {
 	// read from config file
-	if file, err := ioutil.ReadFile(configFilename); err != nil {
+	if execFilepath, err := os.Executable(); err != nil {
 		panic(err)
 	} else {
-		if err := json.Unmarshal(file, &conf); err != nil {
+		if file, err := ioutil.ReadFile(filepath.Join(filepath.Dir(execFilepath), configFilename)); err != nil {
 			panic(err)
+		} else {
+			if err := json.Unmarshal(file, &conf); err != nil {
+				panic(err)
+			}
 		}
 	}
 
