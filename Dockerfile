@@ -1,8 +1,5 @@
 # Dockerfile for Golang application
 
-# Arguments
-ARG CONF_FILE=config.json
-
 # Temporary image for building
 FROM meinside/alpine-golang:latest AS builder
 
@@ -11,8 +8,8 @@ RUN mkdir /user && \
 	echo 'nobody:x:65534:65534:nobody:/:' > /user/passwd && \
 	echo 'nobody:x:65534:' > /user/group
 
-# Install certs, git, and mercurial
-RUN apk add --no-cache ca-certificates git mercurial
+# Install certs
+RUN apk add --no-cache ca-certificates
 
 # Working directory outside $GOPATH
 WORKDIR /src
@@ -37,9 +34,10 @@ FROM scratch as final
 COPY --from=builder /user/group /user/passwd /etc/
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app /
+COPY --from=builder /src/fonts /fonts
 
 # Copy config file
-COPY ./${CONF_FILE} /
+COPY ./config.json /
 
 # Open ports (if needed)
 #EXPOSE 8080
