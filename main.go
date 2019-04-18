@@ -137,17 +137,23 @@ type Config struct {
 
 var conf Config
 
+func pwd() string {
+	if execFilepath, err := os.Executable(); err == nil {
+		return filepath.Dir(execFilepath)
+	}
+
+	return "." // fallback
+}
+
 func init() {
+	pwd := pwd()
+
 	// read from config file
-	if execFilepath, err := os.Executable(); err != nil {
+	if file, err := ioutil.ReadFile(filepath.Join(pwd, configFilename)); err != nil {
 		panic(err)
 	} else {
-		if file, err := ioutil.ReadFile(filepath.Join(filepath.Dir(execFilepath), configFilename)); err != nil {
+		if err := json.Unmarshal(file, &conf); err != nil {
 			panic(err)
-		} else {
-			if err := json.Unmarshal(file, &conf); err != nil {
-				panic(err)
-			}
 		}
 	}
 
@@ -178,7 +184,7 @@ func init() {
 	}
 
 	// others
-	bytes, err := ioutil.ReadFile(fontFilepath)
+	bytes, err := ioutil.ReadFile(filepath.Join(pwd, fontFilepath))
 	if err == nil {
 		var f *truetype.Font
 		f, err = truetype.Parse(bytes)
