@@ -9,8 +9,8 @@ github.com/llgcode/draw2d v0.0.0-20200603164053-19660b984a28 h1:uahb8nqGTCUtkKCS
 github.com/llgcode/draw2d v0.0.0-20200603164053-19660b984a28/go.mod h1:mVa0dA29Db2S4LVqDYLlsePDzRJLDfdhVZiI15uY0FA=
 github.com/llgcode/ps v0.0.0-20150911083025-f1443b32eedb h1:61ndUreYSlWFeCY44JxDDkngVoI7/1MVhEl98Nm0KOk=
 github.com/llgcode/ps v0.0.0-20150911083025-f1443b32eedb/go.mod h1:1l8ky+Ew27CMX29uG+a2hNOKpeNYEQjjtiALiBlFQbY=
-github.com/meinside/kakao-api-go v0.1.1 h1:ysJVgKnS1kf7ADa4cvw/cFl6EoKBlXRsmmyWj9Ghla8=
-github.com/meinside/kakao-api-go v0.1.1/go.mod h1:UaCB48aIMu9m7z9+y2/65YPisKdTH0vrg+DMWLlmqU8=
+github.com/meinside/kakao-api-go v0.2.1 h1:fC5vHZ6cLVIKuyxj2uGFcLXh7z+EE/zDXr1P6QRpL8k=
+github.com/meinside/kakao-api-go v0.2.1/go.mod h1:dLlGzCg9IjlJewzGY9AOgxfOL2r1htvZcNRf+8QYCSY=
 github.com/meinside/loggly-go v0.1.8 h1:S2tZ/xihGvW77y1DJP5RhtzbJW/fg/1xb4T1YNeBu18=
 github.com/meinside/loggly-go v0.1.8/go.mod h1:PZPbV/jxZBRU1hFv/8uo+Hus3p1PZe8ny85vPsCxUSs=
 github.com/meinside/telegram-bot-go v0.2.2 h1:23pcTLoTLCo1b+2jDp2SDI/qATDDmUcn/xJvi1E6X64=

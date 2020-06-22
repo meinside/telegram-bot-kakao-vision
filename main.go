@@ -76,6 +76,7 @@ var allCmds = []VisionCommand{
 }
 var shortCmdsMap = map[VisionCommand]string{}
 var cmdsMap = map[string]VisionCommand{}
+var fileIDs = map[string]string{}
 
 var kakaoClient *kakaoapi.Client
 
@@ -340,28 +341,34 @@ func processCallbackQuery(b *bot.Bot, update bot.Update) bool {
 		message = messageCanceled
 	} else {
 		command := cmdsMap[string(data[0])]
-		fileID := string(data[1:])
+		shortenedFileID := string(data[1:])
 
-		if fileResult := b.GetFile(fileID); fileResult.Ok {
-			fileURL := b.GetFileURL(*fileResult.Result)
+		if fileID, exists := fileIDs[shortenedFileID]; exists {
+			if fileResult := b.GetFile(fileID); fileResult.Ok {
+				fileURL := b.GetFileURL(*fileResult.Result)
 
-			if strings.Contains(*query.Message.Text, "image") {
-				go processImage(b, query.Message.Chat.ID, query.Message.MessageID, fileURL, command)
+				if strings.Contains(*query.Message.Text, "image") {
+					go processImage(b, query.Message.Chat.ID, query.Message.MessageID, fileURL, command)
 
-				message = fmt.Sprintf("Processing '%s' on received image...", command)
+					message = fmt.Sprintf("Processing '%s' on received image...", command)
 
-				// log request
-				if query.From.Username == nil {
-					username = query.From.FirstName
+					// log request
+					if query.From.Username == nil {
+						username = query.From.FirstName
+					} else {
+						username = *query.From.Username
+					}
+					logRequest(username, fileURL, command)
 				} else {
-					username = *query.From.Username
+					message = messageUnprocessable
 				}
-				logRequest(username, fileURL, command)
 			} else {
-				message = messageUnprocessable
+				logError(fmt.Sprintf("Failed to get file from url: %s", *fileResult.Description))
+
+				message = messageFailedToGetFile
 			}
 		} else {
-			logError(fmt.Sprintf("Failed to get file from url: %s", *fileResult.Description))
+			logError(fmt.Sprintf("Failed to get file id from shortened file id: `%s`, maybe bot was restarted?", shortenedFileID))
 
 			message = messageFailedToGetFile
 		}
@@ -385,6 +392,24 @@ func processCallbackQuery(b *bot.Bot, update bot.Update) bool {
 	return result
 }
 
+// read bytes from given url
+func readBytes(url string) (bytes []byte, err error) {
+	var response *http.Response
+	response, err = http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	defer response.Body.Close()
+
+	bytes, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
+}
+
 // process requested image processing
 func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL string, command VisionCommand) {
 	errorMessage := ""
@@ -392,37 +417,188 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 	// 'typing...'
 	b.SendChatAction(chatID, bot.ChatActionTyping)
 
+	var imgBytes []byte
 	var err error
 
-	switch command {
-	case Face, MaskFaces:
-		var detected kakaoapi.ResponseDetectedFace
-		detected, err = kakaoClient.DetectFaceFromURL(fileURL, 0.7)
-		if err == nil {
-			if len(detected.Result.Faces) > 0 {
-				// open image from url,
-				var resp *http.Response
-				resp, err = http.Get(fileURL)
-				if err == nil {
-					defer resp.Body.Close()
-
-					// image's width and height
-					width, height := float64(detected.Result.Width), float64(detected.Result.Height)
-
-					var img image.Image
-					img, _, err = image.Decode(resp.Body)
+	// read image file from url
+	if imgBytes, err = readBytes(fileURL); err == nil {
+		switch command {
+		case Face, MaskFaces:
+			var detected kakaoapi.ResponseDetectedFace
+			detected, err = kakaoClient.DetectFaceFromBytes(imgBytes, 0.7)
+			if err == nil {
+				if len(detected.Result.Faces) > 0 {
+					// open image from url,
+					var resp *http.Response
+					resp, err = http.Get(fileURL)
 					if err == nil {
-						// copy to a new image
-						newImg := image.NewRGBA(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
-						draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
-						gc := draw2dimg.NewGraphicContext(newImg)
-						gc.SetLineWidth(StrokeWidth)
-						gc.SetFillColor(color.Transparent)
+						defer resp.Body.Close()
 
-						// build up facial attributes string
-						for i, f := range detected.Result.Faces {
-							switch command {
-							case Face:
+						// image's width and height
+						width, height := float64(detected.Result.Width), float64(detected.Result.Height)
+
+						var img image.Image
+						img, _, err = image.Decode(resp.Body)
+						if err == nil {
+							// copy to a new image
+							newImg := image.NewRGBA(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
+							draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
+							gc := draw2dimg.NewGraphicContext(newImg)
+							gc.SetLineWidth(StrokeWidth)
+							gc.SetFillColor(color.Transparent)
+
+							// build up facial attributes string
+							for i, f := range detected.Result.Faces {
+								switch command {
+								case Face:
+									// prepare freetype font
+									fc := freetype.NewContext()
+									fc.SetFont(font)
+									fc.SetDPI(72)
+									fc.SetClip(newImg.Bounds())
+									fc.SetDst(newImg)
+									fontSize := float64(newImg.Bounds().Dy()) / 24.0
+									fc.SetFontSize(fontSize)
+
+									// set color
+									color := colorForIndex(i)
+									gc.SetStrokeColor(color)
+									fc.SetSrc(&image.Uniform{color})
+
+									// draw rectangles and their indices on detected faces
+									gc.MoveTo(width*f.X, height*f.Y)
+									gc.LineTo(width*(f.X+f.W), height*f.Y)
+									gc.LineTo(width*(f.X+f.W), height*(f.Y+f.H))
+									gc.LineTo(width*f.X, height*(f.Y+f.H))
+									gc.LineTo(width*f.X, height*f.Y)
+									gc.Close()
+									gc.FillStroke()
+
+									// draw face label
+									if _, err = fc.DrawString(
+										fmt.Sprintf("Face #%d", i+1),
+										freetype.Pt(
+											int(width*f.X+5),
+											int(fc.PointToFixed(height*(f.Y+f.H)-5)>>6),
+										),
+									); err != nil {
+										logError(fmt.Sprintf("Failed to draw string: %s", err))
+									}
+
+									// mark nose
+									nosePoints := f.FacialPoints.Nose
+									for _, n := range nosePoints {
+										gc.MoveTo(width*n.X(), height*n.Y())
+										gc.ArcTo(width*n.X(), height*n.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
+										gc.Close()
+										gc.FillStroke()
+									}
+
+									// mark right eye
+									rightEyePoints := f.FacialPoints.RightEye
+									for _, r := range rightEyePoints {
+										gc.MoveTo(width*r.X(), height*r.Y())
+										gc.ArcTo(width*r.X(), height*r.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
+										gc.Close()
+										gc.FillStroke()
+									}
+
+									// mark left pupil
+									leftEyePoints := f.FacialPoints.LeftEye
+									for _, l := range leftEyePoints {
+										gc.MoveTo(width*l.X(), height*l.Y())
+										gc.ArcTo(width*l.X(), height*l.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
+										gc.Close()
+										gc.FillStroke()
+									}
+
+									// mark lips
+									lipPoints := f.FacialPoints.Lip
+									for _, l := range lipPoints {
+										gc.MoveTo(width*l.X(), height*l.Y())
+										gc.ArcTo(width*l.X(), height*l.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
+										gc.Close()
+										gc.FillStroke()
+									}
+								case MaskFaces:
+									// pixelate face rects
+									g := gift.New(
+										gift.Pixelate(int(width * f.W / 8)),
+									)
+									g.DrawAt(
+										newImg,
+										newImg.SubImage(image.Rect(
+											int(width*f.X),
+											int(height*f.Y),
+											int(width*(f.X+f.W)),
+											int(height*(f.Y+f.H)),
+										)),
+										image.Pt(
+											int(width*f.X),
+											int(height*f.Y),
+										),
+										gift.CopyOperator,
+									)
+								}
+							}
+							gc.Save()
+
+							// 'uploading photo...'
+							b.SendChatAction(chatID, bot.ChatActionUploadPhoto)
+
+							// send a photo with rectangles drawn on detected faces
+							buf := new(bytes.Buffer)
+							err = jpeg.Encode(buf, newImg, nil)
+							if err == nil {
+								if sent := b.SendPhoto(
+									chatID,
+									bot.InputFileFromBytes(buf.Bytes()),
+									bot.OptionsSendPhoto{}.SetCaption(fmt.Sprintf("Process result of '%s'", command)),
+								); !sent.Ok {
+									errorMessage = fmt.Sprintf("Failed to send image: %s", *sent.Description)
+								}
+							} else {
+								errorMessage = fmt.Sprintf("Failed to encode image: %s", err)
+							}
+						} else {
+							errorMessage = fmt.Sprintf("Failed to decode image: %s", err)
+						}
+					} else {
+						errorMessage = fmt.Sprintf("Failed to open image: %s", err)
+					}
+				} else {
+					errorMessage = "No face detected on this image."
+				}
+			} else {
+				errorMessage = fmt.Sprintf("Failed to detect faces: %s", err)
+			}
+		case Product:
+			var detected kakaoapi.ResponseDetectedProduct
+			detected, err = kakaoClient.DetectProductFromBytes(imgBytes, 0.7)
+			if err == nil {
+				if len(detected.Result.Objects) > 0 {
+					// open image from url,
+					if resp, err := http.Get(fileURL); err == nil {
+						defer resp.Body.Close()
+
+						// image's width and height
+						width, height := float64(detected.Result.Width), float64(detected.Result.Height)
+
+						var img image.Image
+						img, _, err = image.Decode(resp.Body)
+						if err == nil {
+							// copy to a new image
+							newImg := image.NewRGBA(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
+							draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
+							gc := draw2dimg.NewGraphicContext(newImg)
+							gc.SetLineWidth(StrokeWidth)
+							gc.SetFillColor(color.Transparent)
+
+							// build up facial attributes string
+							classes := []string{}
+							for i, o := range detected.Result.Objects {
+								classes = append(classes, o.Class)
+
 								// prepare freetype font
 								fc := freetype.NewContext()
 								fc.SetFont(font)
@@ -437,243 +613,98 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 								gc.SetStrokeColor(color)
 								fc.SetSrc(&image.Uniform{color})
 
-								// draw rectangles and their indices on detected faces
-								gc.MoveTo(width*f.X, height*f.Y)
-								gc.LineTo(width*(f.X+f.W), height*f.Y)
-								gc.LineTo(width*(f.X+f.W), height*(f.Y+f.H))
-								gc.LineTo(width*f.X, height*(f.Y+f.H))
-								gc.LineTo(width*f.X, height*f.Y)
+								// draw rectangles and their indices on detected product
+								gc.MoveTo(width*o.X1, height*o.Y1)
+								gc.LineTo(width*o.X1, height*o.Y2)
+								gc.LineTo(width*o.X2, height*o.Y2)
+								gc.LineTo(width*o.X2, height*o.Y1)
+								gc.LineTo(width*o.X1, height*o.Y1)
 								gc.Close()
 								gc.FillStroke()
 
-								// draw face label
+								// draw product label
 								if _, err = fc.DrawString(
-									fmt.Sprintf("Face #%d", i+1),
+									fmt.Sprintf("#%d: %s", i+1, o.Class),
 									freetype.Pt(
-										int(width*f.X+5),
-										int(fc.PointToFixed(height*(f.Y+f.H)-5)>>6),
+										int(width*o.X1+5),
+										int(fc.PointToFixed(height*o.Y2-5)>>6),
 									),
 								); err != nil {
 									logError(fmt.Sprintf("Failed to draw string: %s", err))
 								}
-
-								// mark nose
-								nosePoints := f.FacialPoints.Nose
-								for _, n := range nosePoints {
-									gc.MoveTo(width*n.X(), height*n.Y())
-									gc.ArcTo(width*n.X(), height*n.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
-									gc.Close()
-									gc.FillStroke()
-								}
-
-								// mark right eye
-								rightEyePoints := f.FacialPoints.RightEye
-								for _, r := range rightEyePoints {
-									gc.MoveTo(width*r.X(), height*r.Y())
-									gc.ArcTo(width*r.X(), height*r.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
-									gc.Close()
-									gc.FillStroke()
-								}
-
-								// mark left pupil
-								leftEyePoints := f.FacialPoints.LeftEye
-								for _, l := range leftEyePoints {
-									gc.MoveTo(width*l.X(), height*l.Y())
-									gc.ArcTo(width*l.X(), height*l.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
-									gc.Close()
-									gc.FillStroke()
-								}
-
-								// mark lips
-								lipPoints := f.FacialPoints.Lip
-								for _, l := range lipPoints {
-									gc.MoveTo(width*l.X(), height*l.Y())
-									gc.ArcTo(width*l.X(), height*l.Y(), CircleRadius, CircleRadius, 0, -math.Pi*2)
-									gc.Close()
-									gc.FillStroke()
-								}
-							case MaskFaces:
-								// pixelate face rects
-								g := gift.New(
-									gift.Pixelate(int(width * f.W / 8)),
-								)
-								g.DrawAt(
-									newImg,
-									newImg.SubImage(image.Rect(
-										int(width*f.X),
-										int(height*f.Y),
-										int(width*(f.X+f.W)),
-										int(height*(f.Y+f.H)),
-									)),
-									image.Pt(
-										int(width*f.X),
-										int(height*f.Y),
-									),
-									gift.CopyOperator,
-								)
 							}
-						}
-						gc.Save()
+							gc.Save()
 
-						// 'uploading photo...'
-						b.SendChatAction(chatID, bot.ChatActionUploadPhoto)
+							// 'uploading photo...'
+							b.SendChatAction(chatID, bot.ChatActionUploadPhoto)
 
-						// send a photo with rectangles drawn on detected faces
-						buf := new(bytes.Buffer)
-						err = jpeg.Encode(buf, newImg, nil)
-						if err == nil {
-							if sent := b.SendPhoto(
-								chatID,
-								bot.InputFileFromBytes(buf.Bytes()),
-								bot.OptionsSendPhoto{}.SetCaption(fmt.Sprintf("Process result of '%s'", command)),
-							); !sent.Ok {
-								errorMessage = fmt.Sprintf("Failed to send image: %s", *sent.Description)
+							// send a photo with rectangles drawn on detected faces
+							buf := new(bytes.Buffer)
+							err = jpeg.Encode(buf, newImg, nil)
+							if err == nil {
+								if sent := b.SendPhoto(
+									chatID,
+									bot.InputFileFromBytes(buf.Bytes()),
+									bot.OptionsSendPhoto{}.SetCaption(fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(classes, "\n"))),
+								); !sent.Ok {
+									errorMessage = fmt.Sprintf("Failed to send image: %s", *sent.Description)
+								}
+							} else {
+								errorMessage = fmt.Sprintf("Failed to encode image: %s", err)
 							}
 						} else {
-							errorMessage = fmt.Sprintf("Failed to encode image: %s", err)
+							errorMessage = fmt.Sprintf("Failed to decode image: %s", err)
 						}
 					} else {
-						errorMessage = fmt.Sprintf("Failed to decode image: %s", err)
+						errorMessage = fmt.Sprintf("Failed to open image: %s", err)
 					}
 				} else {
-					errorMessage = fmt.Sprintf("Failed to open image: %s", err)
+					errorMessage = "No product detected on this image."
 				}
-			} else {
-				errorMessage = "No face detected on this image."
 			}
-		} else {
-			errorMessage = fmt.Sprintf("Failed to detect faces: %s", err)
-		}
-	case Product:
-		var detected kakaoapi.ResponseDetectedProduct
-		detected, err = kakaoClient.DetectProductFromURL(fileURL, 0.7)
-		if err == nil {
-			if len(detected.Result.Objects) > 0 {
-				// open image from url,
-				if resp, err := http.Get(fileURL); err == nil {
-					defer resp.Body.Close()
-
-					// image's width and height
-					width, height := float64(detected.Result.Width), float64(detected.Result.Height)
-
-					var img image.Image
-					img, _, err = image.Decode(resp.Body)
-					if err == nil {
-						// copy to a new image
-						newImg := image.NewRGBA(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
-						draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
-						gc := draw2dimg.NewGraphicContext(newImg)
-						gc.SetLineWidth(StrokeWidth)
-						gc.SetFillColor(color.Transparent)
-
-						// build up facial attributes string
-						classes := []string{}
-						for i, o := range detected.Result.Objects {
-							classes = append(classes, o.Class)
-
-							// prepare freetype font
-							fc := freetype.NewContext()
-							fc.SetFont(font)
-							fc.SetDPI(72)
-							fc.SetClip(newImg.Bounds())
-							fc.SetDst(newImg)
-							fontSize := float64(newImg.Bounds().Dy()) / 24.0
-							fc.SetFontSize(fontSize)
-
-							// set color
-							color := colorForIndex(i)
-							gc.SetStrokeColor(color)
-							fc.SetSrc(&image.Uniform{color})
-
-							// draw rectangles and their indices on detected product
-							gc.MoveTo(width*o.X1, height*o.Y1)
-							gc.LineTo(width*o.X1, height*o.Y2)
-							gc.LineTo(width*o.X2, height*o.Y2)
-							gc.LineTo(width*o.X2, height*o.Y1)
-							gc.LineTo(width*o.X1, height*o.Y1)
-							gc.Close()
-							gc.FillStroke()
-
-							// draw product label
-							if _, err = fc.DrawString(
-								fmt.Sprintf("#%d: %s", i+1, o.Class),
-								freetype.Pt(
-									int(width*o.X1+5),
-									int(fc.PointToFixed(height*o.Y2-5)>>6),
-								),
-							); err != nil {
-								logError(fmt.Sprintf("Failed to draw string: %s", err))
-							}
-						}
-						gc.Save()
-
-						// 'uploading photo...'
-						b.SendChatAction(chatID, bot.ChatActionUploadPhoto)
-
-						// send a photo with rectangles drawn on detected faces
-						buf := new(bytes.Buffer)
-						err = jpeg.Encode(buf, newImg, nil)
-						if err == nil {
-							if sent := b.SendPhoto(
-								chatID,
-								bot.InputFileFromBytes(buf.Bytes()),
-								bot.OptionsSendPhoto{}.SetCaption(fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(classes, "\n"))),
-							); !sent.Ok {
-								errorMessage = fmt.Sprintf("Failed to send image: %s", *sent.Description)
-							}
-						} else {
-							errorMessage = fmt.Sprintf("Failed to encode image: %s", err)
-						}
-					} else {
-						errorMessage = fmt.Sprintf("Failed to decode image: %s", err)
-					}
-				} else {
-					errorMessage = fmt.Sprintf("Failed to open image: %s", err)
-				}
-			} else {
-				errorMessage = "No product detected on this image."
-			}
-		}
-	case NSFW:
-		if detected, err := kakaoClient.DetectNSFWFromURL(fileURL); err == nil {
-			// send nsfw factors
-			message := fmt.Sprintf(`Process result of '%s':
+		case NSFW:
+			if detected, err := kakaoClient.DetectNSFWFromBytes(imgBytes); err == nil {
+				// send nsfw factors
+				message := fmt.Sprintf(`Process result of '%s':
 
 Normal: %.2f%%
 Soft: %.2f%%
 Adult: %.2f%%`,
-				command,
-				100.0*detected.Result.Normal,
-				100.0*detected.Result.Soft,
-				100.0*detected.Result.Adult,
-			)
-			if sent := b.SendMessage(chatID, message, nil); !sent.Ok {
-				errorMessage = fmt.Sprintf("Failed to send nsfw factors: %s", *sent.Description)
-			}
-		} else {
-			errorMessage = fmt.Sprintf("Failed to detect NSFW factors from image: %s", err)
-		}
-	case Tag:
-		if generated, err := kakaoClient.GenerateTagsFromURL(fileURL); err == nil {
-			if len(generated.Result.Labels) > 0 {
-				tags := []string{}
-				for i := 0; i < len(generated.Result.Labels); i++ {
-					tags = append(tags, fmt.Sprintf("%s (%s)", generated.Result.Labels[i], generated.Result.LabelsKorean[i]))
-				}
-
-				// send tags
-				message := fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(tags, "\n"))
+					command,
+					100.0*detected.Result.Normal,
+					100.0*detected.Result.Soft,
+					100.0*detected.Result.Adult,
+				)
 				if sent := b.SendMessage(chatID, message, nil); !sent.Ok {
-					errorMessage = fmt.Sprintf("Failed to send tags: %s", *sent.Description)
+					errorMessage = fmt.Sprintf("Failed to send nsfw factors: %s", *sent.Description)
 				}
 			} else {
-				errorMessage = "Could not tag given image."
+				errorMessage = fmt.Sprintf("Failed to detect NSFW factors from image: %s", err)
 			}
-		} else {
-			errorMessage = fmt.Sprintf("Failed to tag image: %s", err)
+		case Tag:
+			if generated, err := kakaoClient.GenerateTagsFromBytes(imgBytes); err == nil {
+				if len(generated.Result.Labels) > 0 {
+					tags := []string{}
+					for i := 0; i < len(generated.Result.Labels); i++ {
+						tags = append(tags, fmt.Sprintf("%s (%s)", generated.Result.Labels[i], generated.Result.LabelsKorean[i]))
+					}
+
+					// send tags
+					message := fmt.Sprintf("Process result of '%s':\n\n%s", command, strings.Join(tags, "\n"))
+					if sent := b.SendMessage(chatID, message, nil); !sent.Ok {
+						errorMessage = fmt.Sprintf("Failed to send tags: %s", *sent.Description)
+					}
+				} else {
+					errorMessage = "Could not tag given image."
+				}
+			} else {
+				errorMessage = fmt.Sprintf("Failed to tag image: %s", err)
+			}
+		default:
+			errorMessage = fmt.Sprintf("Command not supported: %s", command)
 		}
-	default:
-		errorMessage = fmt.Sprintf("Command not supported: %s", command)
+	} else {
+		errorMessage = fmt.Sprintf("Failed to read file from %s: %s", fileURL, err)
 	}
 
 	// delete original message
@@ -689,9 +720,12 @@ Adult: %.2f%%`,
 
 // generate inline keyboards for selecting action
 func genImageInlineKeyboards(fileID string) [][]bot.InlineKeyboardButton {
+	shortenedFileID := fileID[:32]
+	fileIDs[shortenedFileID] = fileID
+
 	data := map[string]string{}
 	for _, cmd := range allCmds {
-		data[string(cmd)] = fmt.Sprintf("%s%s", shortCmdsMap[cmd], fileID)
+		data[string(cmd)] = fmt.Sprintf("%s%s", shortCmdsMap[cmd], shortenedFileID)
 	}
 
 	cancel := commandCancel
