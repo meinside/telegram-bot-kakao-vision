@@ -53,31 +53,48 @@ type logglyLog struct {
 // VisionCommand type
 type VisionCommand string
 
-// XXX - First letter of commands should be unique.
+// XXX - When a new command is added, add it here too.
 const (
-	Face    VisionCommand = "Face Detection"
-	Product VisionCommand = "Product Detection"
-	NSFW    VisionCommand = "NSFW Detection"
-	Tag     VisionCommand = "Tag This Image"
-	Analyze VisionCommand = "Analyze Pose"
+	DetectFaces    VisionCommand = "Detect Faces"
+	DetectProducts VisionCommand = "Detect Products"
+	DetectNSFW     VisionCommand = "Detect NSFW "
+	Tag            VisionCommand = "Tag This Image"
+	AnalyzePoses   VisionCommand = "Analyze Poses"
+	ExtractTexts   VisionCommand = "Extract Texts"
 
 	// fun commands
 	MaskFaces VisionCommand = "Mask Faces"
+
+	None VisionCommand = ""
 )
 
 // XXX - When a new command is added, add it here too.
-var allCmds = []VisionCommand{
-	Face,
-	Product,
-	NSFW,
-	Tag,
-	Analyze,
+var allCmds = map[VisionCommand]string{
+	DetectFaces:    "detect_faces",
+	DetectProducts: "detect_products",
+	DetectNSFW:     "detect_nsfw",
+	Tag:            "tag",
+	AnalyzePoses:   "analyze_poses",
+	ExtractTexts:   "extract_texts",
 
 	// fun commands
-	MaskFaces,
+	MaskFaces: "mask_faces",
 }
-var shortCmdsMap = map[VisionCommand]string{}
-var cmdsMap = map[string]VisionCommand{}
+
+func visionCommandForCommand(cmd string) (result VisionCommand) {
+	result = None
+
+	for k, v := range allCmds {
+		if v == cmd {
+			result = k
+			break
+		}
+	}
+
+	return result
+
+}
+
 var fileIDs = map[string]string{}
 
 var kakaoClient *kakaoapi.Client
@@ -91,10 +108,12 @@ const (
 	messageCanceled        = "Canceled."
 	messageHelp            = `Send any image to this bot, then select one of the following actions:
 
-- Face Detection
-- Product Detection
-- NSFW Detection
+- Detect Faces
+- Detect Products
+- Detect NSFW
 - Tag This Image
+- Analyze Poses
+- Extract Texts
 - Mask Faces
 
 then it will send the result message and/or image back to you.
@@ -170,15 +189,6 @@ func init() {
 
 	// kakao api client
 	kakaoClient = kakaoapi.NewClient(conf.KakaoAPIKey)
-
-	// commands
-	var firstLetter string
-	for _, c := range allCmds {
-		firstLetter = string(string(c)[0])
-
-		shortCmdsMap[c] = firstLetter
-		cmdsMap[firstLetter] = c
-	}
 
 	// telegram bot client
 	client = bot.NewClient(conf.TelegramAPIToken)
@@ -331,9 +341,9 @@ func processUpdate(b *bot.Bot, update bot.Update) bool {
 }
 
 // process incoming callback query
-func processCallbackQuery(b *bot.Bot, update bot.Update) bool {
+func processCallbackQuery(b *bot.Bot, update bot.Update) (result bool) {
 	// process result
-	result := false
+	result = false
 
 	var username string
 	message := ""
@@ -343,37 +353,47 @@ func processCallbackQuery(b *bot.Bot, update bot.Update) bool {
 	if data == commandCancel {
 		message = messageCanceled
 	} else {
-		command := cmdsMap[string(data[0])]
-		shortenedFileID := string(data[1:])
+		parsedCommand := strings.Split(data, "/")
 
-		if fileID, exists := fileIDs[shortenedFileID]; exists {
-			if fileResult := b.GetFile(fileID); fileResult.Ok {
-				fileURL := b.GetFileURL(*fileResult.Result)
+		if len(parsedCommand) >= 2 {
+			command := parsedCommand[0]
+			shortenedFileID := parsedCommand[1]
 
-				if strings.Contains(*query.Message.Text, "image") {
-					go processImage(b, query.Message.Chat.ID, query.Message.MessageID, fileURL, command)
+			if fileID, exists := fileIDs[shortenedFileID]; exists {
+				if fileResult := b.GetFile(fileID); fileResult.Ok {
+					fileURL := b.GetFileURL(*fileResult.Result)
 
-					message = fmt.Sprintf("Processing '%s' on received image...", command)
+					if strings.Contains(*query.Message.Text, "image") {
+						visionCommand := visionCommandForCommand(command)
 
-					// log request
-					if query.From.Username == nil {
-						username = query.From.FirstName
+						go processImage(b, query.Message.Chat.ID, query.Message.MessageID, fileURL, visionCommand)
+
+						message = fmt.Sprintf("Processing '%s' on received image...", visionCommand)
+
+						// log request
+						if query.From.Username == nil {
+							username = query.From.FirstName
+						} else {
+							username = *query.From.Username
+						}
+						logRequest(username, fileURL, visionCommand)
 					} else {
-						username = *query.From.Username
+						message = messageUnprocessable
 					}
-					logRequest(username, fileURL, command)
 				} else {
-					message = messageUnprocessable
+					logError(fmt.Sprintf("Failed to get file from url: %s", *fileResult.Description))
+
+					message = messageFailedToGetFile
 				}
 			} else {
-				logError(fmt.Sprintf("Failed to get file from url: %s", *fileResult.Description))
+				logError(fmt.Sprintf("Failed to get file id from shortened file id: `%s`, maybe bot was restarted?", shortenedFileID))
 
 				message = messageFailedToGetFile
 			}
 		} else {
-			logError(fmt.Sprintf("Failed to get file id from shortened file id: `%s`, maybe bot was restarted?", shortenedFileID))
+			logError(fmt.Sprintf("Failed to parse command: %s", data))
 
-			message = messageFailedToGetFile
+			message = messageUnprocessable
 		}
 	}
 
@@ -429,7 +449,7 @@ func processImageForFaces(img image.Image, detected kakaoapi.ResponseDetectedFac
 	// build up facial attributes string
 	for i, f := range detected.Result.Faces {
 		switch command {
-		case Face:
+		case DetectFaces:
 			// prepare freetype font
 			fc := freetype.NewContext()
 			fc.SetFont(font)
@@ -807,7 +827,7 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 	// read image file from url
 	if imgBytes, err = readBytes(fileURL); err == nil {
 		switch command {
-		case Face, MaskFaces:
+		case DetectFaces, MaskFaces:
 			var detected kakaoapi.ResponseDetectedFace
 			detected, err = kakaoClient.DetectFaceFromBytes(imgBytes, 0.7)
 			if err == nil {
@@ -845,7 +865,7 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 			} else {
 				errorMessage = fmt.Sprintf("Failed to detect faces: %s", err)
 			}
-		case Product:
+		case DetectProducts:
 			var detected kakaoapi.ResponseDetectedProduct
 			detected, err = kakaoClient.DetectProductFromBytes(imgBytes, 0.7)
 			if err == nil {
@@ -880,7 +900,7 @@ func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL strin
 					errorMessage = "No product detected on this image."
 				}
 			}
-		case NSFW:
+		case DetectNSFW:
 			if detected, err := kakaoClient.DetectNSFWFromBytes(imgBytes); err == nil {
 				// send nsfw factors
 				message := fmt.Sprintf(`Process result of '%s':
@@ -918,7 +938,7 @@ Adult: %.2f%%`,
 			} else {
 				errorMessage = fmt.Sprintf("Failed to tag image: %s", err)
 			}
-		case Analyze:
+		case AnalyzePoses:
 			var analyzed kakaoapi.ResponseAnalyzedPose
 			analyzed, err = kakaoClient.AnalyzePoseFromBytes(imgBytes)
 			if err == nil {
@@ -951,6 +971,28 @@ Adult: %.2f%%`,
 			} else {
 				errorMessage = fmt.Sprintf("Failed to detect faces: %s", err)
 			}
+		case ExtractTexts:
+			var detected kakaoapi.ResponseDetectedText
+			detected, err = kakaoClient.DetectTextFromBytes(imgBytes)
+			if err == nil {
+				var recognized kakaoapi.ResponseRecognizedText
+				recognized, err = kakaoClient.RecognizeTextFromBytes(imgBytes, detected.Result.Boxes)
+				if err == nil {
+					strs := strings.Join(recognized.Result.RecognizedWords, ", ")
+
+					message := fmt.Sprintf(`Process result of '%s':
+
+%s`,
+						command,
+						strs,
+					)
+					if sent := b.SendMessage(chatID, message, nil); !sent.Ok {
+						errorMessage = fmt.Sprintf("Failed to send extracted texts: %s", *sent.Description)
+					}
+				}
+			} else {
+				errorMessage = fmt.Sprintf("Failed to detect texts: %s", err)
+			}
 		default:
 			errorMessage = fmt.Sprintf("Command not supported: %s", command)
 		}
@@ -975,8 +1017,8 @@ func genImageInlineKeyboards(fileID string) [][]bot.InlineKeyboardButton {
 	fileIDs[shortenedFileID] = fileID
 
 	data := map[string]string{}
-	for _, cmd := range allCmds {
-		data[string(cmd)] = fmt.Sprintf("%s%s", shortCmdsMap[cmd], shortenedFileID)
+	for title, cmd := range allCmds {
+		data[string(title)] = fmt.Sprintf("%s/%s", cmd, shortenedFileID)
 	}
 
 	cancel := commandCancel
