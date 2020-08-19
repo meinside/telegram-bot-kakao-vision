@@ -189,6 +189,7 @@ func init() {
 
 	// kakao api client
 	kakaoClient = kakaoapi.NewClient(conf.KakaoAPIKey)
+	kakaoClient.Verbose = conf.IsVerbose
 
 	// telegram bot client
 	client = bot.NewClient(conf.TelegramAPIToken)
@@ -975,20 +976,19 @@ Adult: %.2f%%`,
 			var detected kakaoapi.ResponseDetectedText
 			detected, err = kakaoClient.DetectTextFromBytes(imgBytes)
 			if err == nil {
-				var recognized kakaoapi.ResponseRecognizedText
-				recognized, err = kakaoClient.RecognizeTextFromBytes(imgBytes, detected.Result.Boxes)
-				if err == nil {
-					strs := strings.Join(recognized.Result.RecognizedWords, ", ")
+				strs := []string{}
+				for _, result := range detected.Result {
+					strs = append(strs, result.RecognizedWords...)
+				}
 
-					message := fmt.Sprintf(`Process result of '%s':
+				message := fmt.Sprintf(`Process result of '%s':
 
 %s`,
-						command,
-						strs,
-					)
-					if sent := b.SendMessage(chatID, message, nil); !sent.Ok {
-						errorMessage = fmt.Sprintf("Failed to send extracted texts: %s", *sent.Description)
-					}
+					command,
+					strings.Join(strs, ", "),
+				)
+				if sent := b.SendMessage(chatID, message, nil); !sent.Ok {
+					errorMessage = fmt.Sprintf("Failed to send extracted texts: %s", *sent.Description)
 				}
 			} else {
 				errorMessage = fmt.Sprintf("Failed to detect texts: %s", err)
