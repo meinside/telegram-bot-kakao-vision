@@ -7,10 +7,11 @@ github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0/go.mod h1:E/TSTwGw
 github.com/jung-kurt/gofpdf v1.0.0/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
 github.com/llgcode/draw2d v0.0.0-20200603164053-19660b984a28 h1:uahb8nqGTCUtkKCSdYwU8CsNfkTz4VEeOXxeM2E7VTQ=
 github.com/llgcode/draw2d v0.0.0-20200603164053-19660b984a28/go.mod h1:mVa0dA29Db2S4LVqDYLlsePDzRJLDfdhVZiI15uY0FA=
-github.com/llgcode/ps v0.0.0-20150911083025-f1443b32eedb h1:61ndUreYSlWFeCY44JxDDkngVoI7/1MVhEl98Nm0KOk=
 github.com/llgcode/ps v0.0.0-20150911083025-f1443b32eedb/go.mod h1:1l8ky+Ew27CMX29uG+a2hNOKpeNYEQjjtiALiBlFQbY=
-github.com/meinside/kakao-api-go v0.2.3 h1:VdZxwr1cg2pMt1Re0aC/EgraKAbpkar3JL4IfO5gCAw=
-github.com/meinside/kakao-api-go v0.2.3/go.mod h1:dLlGzCg9IjlJewzGY9AOgxfOL2r1htvZcNRf+8QYCSY=
+github.com/meinside/kakao-api-go v0.2.4 h1:i82MxG4EoczBS2CMzMKGRhyuxOq2IFB9OKpzxRGUgZ0=
+github.com/meinside/kakao-api-go v0.2.4/go.mod h1:dLlGzCg9IjlJewzGY9AOgxfOL2r1htvZcNRf+8QYCSY=
+github.com/meinside/kakao-api-go v0.2.5 h1:CZSKZeA/d2ySiZlq8nnOOrdJEMKw1Ae73PnWCyWg2Ww=
+github.com/meinside/kakao-api-go v0.2.5/go.mod h1:dLlGzCg9IjlJewzGY9AOgxfOL2r1htvZcNRf+8QYCSY=
 github.com/meinside/loggly-go v0.1.8 h1:S2tZ/xihGvW77y1DJP5RhtzbJW/fg/1xb4T1YNeBu18=
 github.com/meinside/loggly-go v0.1.8/go.mod h1:PZPbV/jxZBRU1hFv/8uo+Hus3p1PZe8ny85vPsCxUSs=
 github.com/meinside/telegram-bot-go v0.2.2 h1:23pcTLoTLCo1b+2jDp2SDI/qATDDmUcn/xJvi1E6X64=
