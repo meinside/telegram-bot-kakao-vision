@@ -137,12 +137,12 @@ const (
 
 // colors
 var colors = []color.RGBA{
-	color.RGBA{255, 255, 0, 255}, // yellow
-	color.RGBA{0, 255, 255, 255}, // cyan
-	color.RGBA{255, 0, 255, 255}, // purple
-	color.RGBA{0, 255, 0, 255},   // green
-	color.RGBA{0, 0, 255, 255},   // blue
-	color.RGBA{255, 0, 0, 255},   // red
+	{255, 255, 0, 255}, // yellow
+	{0, 255, 255, 255}, // cyan
+	{255, 0, 255, 255}, // purple
+	{0, 255, 0, 255},   // green
+	{0, 0, 255, 255},   // blue
+	{255, 0, 0, 255},   // red
 }
 var maskColor = color.RGBA{0, 0, 0, 255} // black
 
@@ -229,7 +229,7 @@ func main() {
 		logMessage(fmt.Sprintf("Starting bot: @%s (%s)", *me.Result.Username, me.Result.FirstName))
 
 		// delete webhook (getting updates will not work when wehbook is set up)
-		if unhooked := client.DeleteWebhook(); unhooked.Ok {
+		if unhooked := client.DeleteWebhook(true); unhooked.Ok {
 			// wait for new updates
 			client.StartMonitoringUpdates(
 				0,
@@ -816,7 +816,7 @@ func processImageForPoses(img image.Image, analyzed kakaoapi.ResponseAnalyzedPos
 }
 
 // process requested image processing
-func processImage(b *bot.Bot, chatID int64, messageIDToDelete int, fileURL string, command VisionCommand) {
+func processImage(b *bot.Bot, chatID int64, messageIDToDelete int64, fileURL string, command VisionCommand) {
 	errorMessage := ""
 
 	// 'typing...'
@@ -1023,7 +1023,7 @@ func genImageInlineKeyboards(fileID string) [][]bot.InlineKeyboardButton {
 
 	cancel := commandCancel
 	return append(bot.NewInlineKeyboardButtonsAsRowsWithCallbackData(data), []bot.InlineKeyboardButton{
-		bot.InlineKeyboardButton{Text: strings.Title(commandCancel), CallbackData: &cancel},
+		{Text: strings.Title(commandCancel), CallbackData: &cancel},
 	})
 }
 
